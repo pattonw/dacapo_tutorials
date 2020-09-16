@@ -37,7 +37,7 @@ If you would like to inspect your data before training on it, use
 `python visualize_data.py data/example_data/example_data.zarr`
 
 ## 3) Data Storage
-Modify the mongodb storage:
+Modify the mongodb storage in `dacapo.conf`:
 
 after `mongo_db_host` provide the url to a mongodb to which you have access
 
