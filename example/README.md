@@ -1,7 +1,8 @@
 # DaCapo example:
 
 ## 0) Setup
-It is recommended that you create some sort of virtual environment:
+It is recommended that you create a conda environment:
+
 [`conda`](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html)
 
 ## 1) Installation
@@ -45,7 +46,7 @@ after `mongo_db_name` provide a name to store your dacapo data. For example: `da
 ## 4) Run DaCapo
 `python run.py -r example.conf`
 
-## 4.5) Visualize training data
+## 4.1) Visualize training data
 DaCapo saves snapshots during training as well as validation results. To visualize these use
 
 `python visualize_data.py runs/{run_name}/...`
