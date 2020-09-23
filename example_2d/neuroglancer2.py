@@ -12,21 +12,36 @@ logger = logging.getLogger(__name__)
 def add_layer(context, array, name, voxel_size, array_offset, visible=True, **kwargs):
     array_dims = len(array.shape)
     spatial_dims = len(voxel_size)
-    assert spatial_dims == 3
+    assert spatial_dims == 2
     channel_dims = array_dims - spatial_dims
+    spatial_attrs = {
+        2: {"names": ["y", "x"], "units": ["nm"] * 2, "scales": voxel_size},
+        3: {"names": ["z", "y", "x"], "units": ["nm", "nm", ""], "scales": voxel_size},
+    }
+    channel_attrs = {
+        0: {
+            "names": [],
+            "units": [],
+            "scales": [],
+        },
+        1: {
+            "names": ["c^"],
+            "units": [""],
+            "scales": [1],
+        },
+        2: {
+            "names": ["c^", "b^"],
+            "units": ["", ""],
+            "scales": [1, 1],
+        },
+    }
     attrs = {
-        2: {"names": ["y", "x"], "units": "nm", "scales": voxel_size},
-        3: {"names": ["z", "y", "x"], "units": "nm", "scales": voxel_size},
-        4: {
-            "names": ["c^", "z", "y", "x"],
-            "units": ["", "nm", "nm", "nm"],
-            "scales": [1, *voxel_size],
-        },
-        5: {
-            "names": ["c^", "b^", "z", "y", "x"],
-            "units": ["", "", "nm", "nm", "nm"],
-            "scales": [1, 1, *voxel_size],
-        },
+        k: v_channel + v_spatial
+        for k, v_channel, v_spatial in zip(
+            channel_attrs[channel_dims].keys(),
+            channel_attrs[channel_dims].values(),
+            spatial_attrs[spatial_dims].values(),
+        )
     }
     dimensions = neuroglancer.CoordinateSpace(**attrs[array_dims])
     offset = np.array((0,) * (channel_dims) + array_offset)
