@@ -2,6 +2,7 @@
 
 ## 0) Setup
 It is recommended that you create a conda environment:
+Python version 3.6 or greater is recommended.
 
 [`conda`](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html)
 
