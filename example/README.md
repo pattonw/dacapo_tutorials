@@ -36,7 +36,7 @@ Otherwise you will need to obtain a dataset. The dataset is expected to have the
 ## 2.1) Visualize your data
 If you would like to inspect your data before training on it, use
 
-`python visualize_data.py data/example_data/example_data.zarr`
+`python visualize_neuroglancer2.py data/example_data/example_data.zarr`
 
 ## 3) Data Storage
 Modify the mongodb storage in `dacapo.conf`:
