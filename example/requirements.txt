@@ -6,6 +6,7 @@ git+git://github.com/funkey/gunpowder@patch-1.1.6
 git+git://github.com/pattonw/dacapo@master
 git+git://github.com/pattonw/funlib.run
 git+git://github.com/funkelab/daisy@0.3-dev
+git+git://github.com/funkelab/funlib.math
 
 neuroglancer
 bokeh
