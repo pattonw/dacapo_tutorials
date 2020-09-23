@@ -21,13 +21,8 @@ Then install the remaining requirements, including dacapo itself:
 Finally install torch as described [here](https://pytorch.org/get-started/locally/)
 
 ## 2) Get some data
-If you have access to the Janelia File System, there is some example data that you can copy using scp or your prefered copying tool from
-
-`example/path` -> `./data/example_data/example_data.zarr`.
-
-Otherwise you will need to obtain a dataset. The dataset is expected to have the following form:
-
-1) Zarr container named `example_data.zarr`.
+You will need:
+1) Zarr container named `data/example_data/example_data.zarr`.
 2) This container should contain 2 groups: `raw`, `validation`.
 3) Both `raw`, and `validation` should contain two arrays, `raw`, `gt`.
 
