@@ -39,7 +39,7 @@ after `mongo_db_host` provide the url to a mongodb to which you have access
 after `mongo_db_name` provide a name to store your dacapo data. For example: `dacapo_v0.1`
 
 ## 4) Run DaCapo
-`python run.py -r example.conf`
+`dacapo run --config example.conf`
 
 ## 4.1) Visualize training data
 DaCapo saves snapshots during training as well as validation results. To visualize these use
