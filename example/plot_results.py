@@ -24,6 +24,8 @@ if __name__ == "__main__":
     dacapo.analyze.plot_runs(runs, smooth=100, validation_score='voi_sum')
     #again.analyze.plot_runs(runs, smooth=100)
 
+    input("Enter to continue")
+
     import numpy as np
 
     def get_best(self, score_name=None, higher_is_better=True):
