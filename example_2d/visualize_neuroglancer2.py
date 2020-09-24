@@ -16,7 +16,7 @@ if __name__ == "__main__":
     voxel_size = [4, 4]
 
     dimensions = neuroglancer.CoordinateSpace(
-        names=["z", "y", "x"], units="nm", scales=voxel_size
+        names=["y", "x"], units="nm", scales=voxel_size
     )
 
     snapshot_files = snapshot_file.split(",")
@@ -26,6 +26,7 @@ if __name__ == "__main__":
 
 
     with viewer.txn() as s:
+        s.layout.type = '2d'
         for snapshot_file in snapshot_files:
             path = snapshot_file.split("/")
             if path[-2] == "snapshots":

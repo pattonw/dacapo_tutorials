@@ -15,8 +15,12 @@ def add_layer(context, array, name, voxel_size, array_offset, visible=True, **kw
     assert spatial_dims == 2
     channel_dims = array_dims - spatial_dims
     spatial_attrs = {
-        2: {"names": ["y", "x"], "units": ["nm"] * 2, "scales": voxel_size},
-        3: {"names": ["z", "y", "x"], "units": ["nm", "nm", ""], "scales": voxel_size},
+        2: {"names": ["y", "x"], "units": ["nm", "nm"], "scales": list(voxel_size)},
+        3: {
+            "names": ["z", "y", "x"],
+            "units": ["nm", "nm", "nm"],
+            "scales": list(voxel_size),
+        },
     }
     channel_attrs = {
         0: {
@@ -36,16 +40,22 @@ def add_layer(context, array, name, voxel_size, array_offset, visible=True, **kw
         },
     }
     attrs = {
-        k: v_channel + v_spatial
-        for k, v_channel, v_spatial in zip(
-            channel_attrs[channel_dims].keys(),
-            channel_attrs[channel_dims].values(),
-            spatial_attrs[spatial_dims].values(),
-        )
+        array_dims: {
+            k: v_channel + v_spatial
+            for k, v_channel, v_spatial in zip(
+                channel_attrs[channel_dims].keys(),
+                channel_attrs[channel_dims].values(),
+                spatial_attrs[spatial_dims].values(),
+            )
+        }
     }
     dimensions = neuroglancer.CoordinateSpace(**attrs[array_dims])
     offset = np.array((0,) * (channel_dims) + array_offset)
     offset = offset // attrs[array_dims]["scales"]
+
+    if channel_dims > 0 and array.dtype == np.uint8:
+        array = array.astype(np.float32) / 255
+    print(name, array.shape, array.dtype)
 
     channels = ",".join(
         [
@@ -53,7 +63,7 @@ def add_layer(context, array, name, voxel_size, array_offset, visible=True, **kw
             for i in range(3)
         ]
     )
-    shader_4d = (
+    shader_1_channel = (
         """
 void main() {
   emitRGB(vec3(%s));
@@ -61,10 +71,12 @@ void main() {
 """
         % channels
     )
-    shader_3d = """
+    shader_no_channels = """
 void main () {
   emitGrayscale(toNormalized(getDataValue()));
 }"""
+
+    shaders = {0: shader_no_channels, 1: shader_1_channel}
 
     layer = neuroglancer.LocalVolume(
         data=array, dimensions=dimensions, voxel_offset=tuple(offset)
@@ -77,7 +89,7 @@ void main () {
             name=name,
             layer=layer,
             visible=visible,
-            shader=shader_4d if array_dims == 4 else shader_3d,
+            shader=shaders[channel_dims],
             **kwargs,
         )
 
