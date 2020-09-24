@@ -51,7 +51,8 @@ after `mongo_db_name` provide a name to store your dacapo data. For example: `da
 ## 4.1) Visualize training data
 DaCapo saves snapshots during training as well as validation results. To visualize these use
 
-`python visualize_data.py runs/{run_name}/...`
+`python visualize_neuroglancer2.py runs/{run_name}/...`
 
 ## 5) Visualize Results
+Install jupyter if you'd like to use the notebook: [jupyter](https://jupyter.org/install)
 After DaCapo has finished running, you can visualize your results. You can use the `plot_results.ipynb` jupyter notebook (make sure you use a kernel with your virtual environment) or you can run `python plot_results.py`.
