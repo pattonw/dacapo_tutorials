@@ -2,15 +2,18 @@ import daisy
 import neuroglancer
 import numpy as np
 import zarr
+import h5py
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def add_layer(context, array, name, visible=True, **kwargs):
+def add_layer(context, array, name, voxel_size, array_offset, visible=True, **kwargs):
     array_dims = len(array.shape)
-    voxel_size = array.voxel_size
+    spatial_dims = len(voxel_size)
+    assert spatial_dims == 3
+    channel_dims = array_dims - spatial_dims
     attrs = {
         2: {"names": ["y", "x"], "units": "nm", "scales": voxel_size},
         3: {"names": ["z", "y", "x"], "units": "nm", "scales": voxel_size},
@@ -19,16 +22,15 @@ def add_layer(context, array, name, visible=True, **kwargs):
             "units": ["", "nm", "nm", "nm"],
             "scales": [1, *voxel_size],
         },
+        5: {
+            "names": ["c^", "b^", "z", "y", "x"],
+            "units": ["", "", "nm", "nm", "nm"],
+            "scales": [1, 1, *voxel_size],
+        },
     }
     dimensions = neuroglancer.CoordinateSpace(**attrs[array_dims])
-    offset = np.array((0,) * (array_dims - 3) + array.roi.get_offset())
+    offset = np.array((0,) * (channel_dims) + array_offset)
     offset = offset // attrs[array_dims]["scales"]
-    # if len(offset) == 2:
-    #     offset = (0,) + tuple(offset)
-
-    d = np.asarray(array.data)
-    if array.data.dtype == np.dtype(bool):
-        array.data = np.array(d, dtype=np.float32)
 
     channels = ",".join(
         [
@@ -50,10 +52,10 @@ void main () {
 }"""
 
     layer = neuroglancer.LocalVolume(
-        data=array.data, dimensions=dimensions, voxel_offset=tuple(offset)
+        data=array, dimensions=dimensions, voxel_offset=tuple(offset)
     )
 
-    if array.data.dtype == np.dtype(np.uint64):
+    if array.dtype == np.dtype(np.uint64):
         context.layers.append(name=name, layer=layer, visible=visible)
     else:
         context.layers.append(
@@ -65,29 +67,39 @@ void main () {
         )
 
 
-def get_volumes(h5_file, path):
+def get_volumes(h5_file, path=None):
     datasets = []
     try:
-        for key in h5_file.get(path, {}).keys():
-            datasets += get_volumes(h5_file, f"{path}/{key}")
-        return datasets
+        if path is None:
+            for key in h5_file.keys():
+                datasets += get_volumes(h5_file, f"{key}")
+            return datasets
+        else:
+            for key in h5_file.get(path, {}).keys():
+                datasets += get_volumes(h5_file, f"{path}/{key}")
+            return datasets
     except AttributeError:
         return [path]
 
 
-def add_snapshot(
+def add_container(
     context,
     snapshot_file,
     name_prefix="",
-    volume_paths=["volumes"],
-    graph_paths=["points"],
+    volume_paths=[None],
+    graph_paths=[None],
     graph_node_attrs=None,
     graph_edge_attrs=None,
     # mst=["embedding", "fg_maxima"],
     mst=None,
     roi=None,
+    modify=None,
+    dims=3,
 ):
-    f = zarr.open(str(snapshot_file.absolute()), "r")
+    if snapshot_file.name.endswith(".zarr") or snapshot_file.name.endswith(".n5"):
+        f = zarr.open(str(snapshot_file.absolute()), "r")
+    elif snapshot_file.name.endswith(".h5") or snapshot_file.name.endswith(".hdf"):
+        f = h5py.File(str(snapshot_file.absolute()), "r")
     with f as dataset:
         volumes = []
         for volume in volume_paths:
@@ -101,4 +113,66 @@ def add_snapshot(
             if v.dtype == np.int64:
                 v.materialize()
                 v.data = v.data.astype(np.uint64)
-            add_layer(context, v, f"{name_prefix}_{volume}", visible=False)
+            if v.dtype == np.dtype(bool):
+                v.materialize()
+                v.data = v.data.astype(np.float32)
+
+            v.materialize()
+            if modify is not None:
+                data = modify(v.data, volume)
+            else:
+                data = v.data
+
+            add_layer(
+                context,
+                data,
+                f"{name_prefix}_{volume}",
+                visible=False,
+                voxel_size=v.voxel_size[-dims:],
+                array_offset=v.roi.get_offset()[-dims:],
+            )
+
+
+def add_dacapo_snapshot(
+    context,
+    snapshot_file,
+    name_prefix="",
+    volume_paths=[None],
+    graph_paths=[None],
+    graph_node_attrs=None,
+    graph_edge_attrs=None,
+    # mst=["embedding", "fg_maxima"],
+    mst=None,
+    roi=None,
+):
+    def modify(v, name):
+        if name == "prediction":
+            v = reshape_batch_channel(v, 1, 3)
+        elif name == "raw":
+            v = reshape_batch_channel(v, 0, 2)
+        if name == "target":
+            v = reshape_batch_channel(v, 1, 3)
+        return v
+
+    add_container(
+        context,
+        snapshot_file,
+        name_prefix,
+        volume_paths,
+        graph_paths,
+        graph_node_attrs,
+        graph_edge_attrs,
+        mst,
+        roi,
+        modify,
+    )
+
+
+def reshape_batch_channel(array, batch_dim=0, concat_dim=0):
+    # Given shape (a0, a1, ..., am) and batch dim k:
+    # First remove the dim ak: new_shape = (a0, a1, ..., ak-1, ak+1, ..., am)
+    # Next replace concat_dim with -1
+
+    if batch_dim is not None:
+        array = np.concatenate(np.rollaxis(array, batch_dim), concat_dim)
+    return array
