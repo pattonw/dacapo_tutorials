@@ -95,6 +95,8 @@ def add_container(
     roi=None,
     modify=None,
     dims=3,
+    array_offset=None,
+    voxel_size=None,
 ):
     if snapshot_file.name.endswith(".zarr") or snapshot_file.name.endswith(".n5"):
         f = zarr.open(str(snapshot_file.absolute()), "r")
@@ -123,20 +125,25 @@ def add_container(
             else:
                 data = v.data
 
+
+            if voxel_size is None:
+                voxel_size = v.voxel_size[-dims:]
+            if array_offset is None:
+                array_offset = v.roi.get_offset()[-dims:]
             add_layer(
                 context,
                 data,
                 f"{name_prefix}_{volume}",
                 visible=False,
-                voxel_size=v.voxel_size[-dims:],
-                array_offset=v.roi.get_offset()[-dims:],
+                voxel_size=voxel_size,
+                array_offset=array_offset,
             )
 
 
 def add_dacapo_snapshot(
     context,
     snapshot_file,
-    name_prefix="",
+    name_prefix="snapshot",
     volume_paths=[None],
     graph_paths=[None],
     graph_node_attrs=None,
@@ -145,13 +152,22 @@ def add_dacapo_snapshot(
     mst=None,
     roi=None,
 ):
+    raw = daisy.open_ds(str(snapshot_file.absolute()), f"raw")
+    raw_shape = raw.shape[-3:]
+    voxel_size = raw.voxel_size[-3:]
+    array_offset = raw.roi.get_offset()[-3:]
     def modify(v, name):
         if name == "prediction":
-            v = reshape_batch_channel(v, 1, 3)
+            v = reshape_batch_channel(v, 1, 3, raw_shape)
         elif name == "raw":
-            v = reshape_batch_channel(v, 0, 2)
-        if name == "target":
-            v = reshape_batch_channel(v, 1, 3)
+            v = reshape_batch_channel(v, 0, 2, raw_shape)
+        elif name == "target":
+            v = reshape_batch_channel(v, 1, 3, raw_shape)
+        elif name == "weights":
+            v = reshape_batch_channel(v, 1, 3, raw_shape)
+        else:
+            print(f"Modifying unknown array {name} with shape {v.shape}")
+            v = reshape_batch_channel(v, 1, 3, raw_shape)
         return v
 
     add_container(
@@ -165,14 +181,24 @@ def add_dacapo_snapshot(
         mst,
         roi,
         modify,
+        voxel_size = voxel_size,
+        array_offset = array_offset,
     )
 
 
-def reshape_batch_channel(array, batch_dim=0, concat_dim=0):
+def reshape_batch_channel(array, batch_dim=0, concat_dim=0, raw_shape=None):
     # Given shape (a0, a1, ..., am) and batch dim k:
     # First remove the dim ak: new_shape = (a0, a1, ..., ak-1, ak+1, ..., am)
     # Next replace concat_dim with -1
+    def pad_volumes(volumes, shape):
+        for v in volumes:
+            v_shape = np.array(v.shape[-3:], dtype=np.uint32)
+            diff = shape - v_shape
+            pad = diff // 2
+            assert all(np.isclose(pad * 2, diff))
+            pad = ((0,0),)*(len(v.shape)-3) + tuple((p, p) for p in pad)
+            yield np.pad(v, pad, mode="constant", constant_values=np.nan)
 
     if batch_dim is not None:
-        array = np.concatenate(np.rollaxis(array, batch_dim), concat_dim)
+        array = np.concatenate(list(pad_volumes(np.rollaxis(array, batch_dim), raw_shape)), concat_dim)
     return array
